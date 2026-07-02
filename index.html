@@ -251,11 +251,6 @@ body{height:100vh !important;overflow:hidden !important;padding:0 0 0 214px !imp
 </div>
 <div class="hdr">
   <div><div class="htitle">Empty Set</div><div class="hsub">Ingredient &amp; recipe model v4 — extraction-aware</div></div>
-  <div style="display:flex;gap:6px;align-items:center;">
-    <button class="btn sm" onclick="backupDownload()" title="Download a full local backup: ingredient DB + recipes + methods/process params">Backup</button>
-    <label class="btn sm" style="cursor:pointer;margin:0;" title="Restore from a backup .json file (does not touch the cloud until you Save)">Restore<input type="file" accept="application/json,.json" style="display:none;" onchange="backupRestore(this)"></label>
-    <button class="btn sm" onclick="downloadIngredients()" title="Download the ingredient library as ingredients.json — commit it to the repo to publish edits">ingredients.json</button>
-  </div>
 </div>
 <div class="sbar"><span id="sleft">102 ingredients · local</span><span id="scount"></span></div>
 
@@ -308,10 +303,6 @@ body{height:100vh !important;overflow:hidden !important;padding:0 0 0 214px !imp
   </div>
   <div id="r-versionbar" class="versionbar" style="display:none;"></div>
   <div class="recipe-cols"><div class="rcol-form">
-  <div id="r-briefbar" class="versionbar">
-    <div class="vbar-top"><span id="r-brieftag"></span><button class="btn sm" id="r-briefbtn" onclick="toggleBrief()"></button></div>
-    <div id="r-briefedit" style="margin-top:8px;"></div>
-  </div>
   <div id="r-comparebar" style="display:none;"></div>
   <div id="r-notesbar" style="padding:8px 18px;background:#fff;border-bottom:1.5px solid #e8e6e0;display:none;"></div>
   <div style="padding:10px 18px;background:#fff;border-bottom:1.5px solid #e8e6e0;">
@@ -335,6 +326,11 @@ body{height:100vh !important;overflow:hidden !important;padding:0 0 0 214px !imp
 <div id="view-meth" style="display:none;">
   <div class="note" style="padding-top:14px;">Each ingredient stores its <b>full flavour potential</b> once. A method multiplies every component by the method&#8217;s <b>affinity</b> for that component&#8217;s solubility class, then applies a small <b>temporal bias</b>. Same ingredient, different profile per method.</div>
   <div id="meth-savebar" style="padding:8px 18px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #e8e6e0;"></div>
+  <div style="padding:14px 18px;border-bottom:1px solid #e8e6e0;"><div class="plabel">Data</div><div style="display:flex;gap:8px;">
+    <button class="btn sm" onclick="backupDownload()" title="Download a full local backup: ingredient DB + recipes + methods/process params">Backup</button>
+    <label class="btn sm" style="cursor:pointer;margin:0;" title="Restore from a backup .json file (does not touch the cloud until you Save)">Restore<input type="file" accept="application/json,.json" style="display:none;" onchange="backupRestore(this)"></label>
+    <button class="btn sm" onclick="downloadIngredients()" title="Download the ingredient library as ingredients.json — commit it to the repo to publish edits">ingredients.json</button>
+  </div></div>
   <div style="padding:0 18px;"><div class="plabel">Class affinity (multiplier 0&#8211;1.2)</div><div id="affwrap"></div></div>
   <div style="padding:14px 18px;"><div class="plabel">Temporal bias per method</div><div id="biaswrap"></div></div>
   <div style="padding:0 18px;"><div id="paramwrap"></div></div>
@@ -1181,7 +1177,7 @@ function renderRecipe(){
     '<div class="headline">'+headline(res)+'</div>'+
     kpiCards(res)+
     '<div class="dgrid-tt">'+
-      '<div class="dcard"><div class="plabel">Temporal shape</div><div style="display:flex;align-items:center;min-height:190px;">'+temporalSVG(res,baseRes,recipeNm,gLbl)+'</div></div>'+
+      '<div class="dcard"><div class="plabel">Temporal shape</div><div style="display:flex;align-items:center;min-height:230px;">'+temporalSVG(res,baseRes,recipeNm,gLbl)+'</div></div>'+
       '<div class="dcard"><div class="plabel">Taste profile</div><div class="chartbox" style="height:250px;"><canvas id="rc-taste"></canvas></div></div>'+
     '</div>'+
     '<div class="dgrid2">'+
@@ -1222,7 +1218,7 @@ function temporalSVG(res,baseRes,nowLbl,ghostLbl){
   var comp=baseRes?LAYERS.map(function(l){return baseRes.layer[l]||0;}):null;
   var rawMax=Math.max.apply(null,vals.concat(comp||[]).concat([1]))*1.15;
   var niceMax=Math.max(10,Math.ceil(rawMax/10)*10);
-  var W=560,H=236,padL=32,padR=10,padT=30,padB=28;
+  var W=560,H=290,padL=32,padR=10,padT=30,padB=28;
   var iw=W-padL-padR, ih=H-padT-padB;
   function x(i){return padL+(i/(LAYERS.length-1))*iw;}
   function y(v){return padT+ih-(v/niceMax)*ih;}
@@ -1464,14 +1460,14 @@ function renderMethods(){
 }
 function renderParams(){
   var el=document.getElementById('paramwrap');if(!el)return;
-  function num(expr,val,step,w){return '<input type="number" step="'+(step||0.05)+'" value="'+val+'" style="width:'+(w||58)+'px;" onchange="var v=parseFloat(this.value);if(!isNaN(v)){'+expr+'=v;markMethodsDirty();}">';}
+  function num(expr,val,step,w){return '<input type="number" step="'+(step||0.05)+'" value="'+val+'" style="width:'+(w||58)+'px;font-family:\'Space Mono\',monospace;font-size:11px;text-align:center;border:1px solid #e8e6e0;padding:4px 3px;background:#fff;" onchange="var v=parseFloat(this.value);if(!isNaN(v)){'+expr+'=v;markMethodsDirty();}">';}
   function pair(lbl,expr,val,step){return '<span style="display:inline-flex;flex-direction:column;margin:0 12px 8px 0;"><span style="font-size:9px;color:#888;margin-bottom:2px;">'+lbl+'</span>'+num(expr,val,step)+'</span>';}
   function classRow(obj,name){return CLASSES.map(function(c){return pair(c.replace('pungent-','p-'),name+"['"+c+"']",obj[c],0.05);}).join('');}
   function layerRow(obj,name){return LAYERS.map(function(l){return pair(l,name+"['"+l+"']",obj[l],0.05);}).join('');}
   function br(){return '<span style="flex-basis:100%;height:0;"></span>';}
   function sec(title,explain,body){return '<div style="margin-top:16px;border-top:1px solid #e8e6e0;padding-top:10px;"><div class="plabel">'+title+'</div><div style="font-size:10px;color:#888;margin:2px 0 8px;line-height:1.5;">'+explain+'</div><div style="display:flex;flex-wrap:wrap;align-items:flex-end;">'+body+'</div></div>';}
   el.innerHTML=
-    '<div class="plabel" style="font-size:12px;">Model parameters</div>'+
+    '<div class="plabel">Model parameters</div>'+
     '<div style="font-size:10px;color:#888;">The knobs the model used to hard-code. Saved with your recipes (dev bin); older saves load with defaults.</div>'+
     sec('Potency &amp; dose law','Stevens\u2019 Power-Law exponents \u2014 how fast a note grows as you raise its dose. Lower = saturates fast (potent aromatics; doubling adds little); higher = faster-than-linear (bulk botanicals get loud). This is why flat dose increases backfire. Ref dose is the anchor the curve is normalised to.',
       pair('high potency','STEV.high',STEV.high)+pair('normal','STEV.normal',STEV.normal)+pair('low potency','STEV.low',STEV.low)+pair('ref dose g/L','REF_DOSE',REF_DOSE,0.5))+
