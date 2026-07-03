@@ -231,6 +231,18 @@ body{height:100vh !important;overflow:hidden !important;padding:0 0 0 214px !imp
 .dcard .bigmove{font-size:11px;color:#6b675c;}
 .dcard #modeb-panel{margin-top:0 !important;border-top:none !important;padding-top:0 !important;}
 .headline{background:#fff !important;border:1px solid #e8e6e0 !important;border-radius:11px !important;padding:13px 16px !important;margin-bottom:14px !important;box-shadow:0 1px 2px rgba(20,18,12,.03);font-size:13px !important;}
+/* ---- ingredients list: card rows ---- */
+#view-ing .toolbar{padding:0 0 6px !important;}
+#view-ing .search{max-width:480px;}
+#view-ing .fbar,#view-ing .filterrow{background:transparent;border-bottom:none;padding-left:0;padding-right:0;}
+#view-ing .list{padding:0 14px 0 0;}
+#view-ing .ing-cols{gap:20px;}
+#view-ing .ing-left{border-right:none;}
+.row{background:#fff;border:1px solid #e8e6e0;border-radius:8px;padding:11px 13px;margin-bottom:8px;box-shadow:0 1px 2px rgba(20,18,12,.03);}
+.row:hover{background:#faf9f5;}
+.row.sel{background:#fbf4f0;border-color:#ddd9d0;box-shadow:inset 3px 0 0 #E8312A;}
+.ftag{border-radius:4px;}
+#briefs-save:disabled{opacity:.55;cursor:default;}
 /* formula column polish */
 .rcol-form .bhdr,.rcol-form .batch-hdr{margin-top:4px;}
 </style>
@@ -1743,7 +1755,7 @@ function cloudSave(reason,quiet){
     interactions:IX}};
   fetch(BURL,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':KEY},body:JSON.stringify(payload)})
    .then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error('PUT '+r.status+' '+t.slice(0,120));});return r.json();})
-   .then(function(){methodsDirty=false;updateMethodsSaveBar();if(quiet)showPop(reason||'Saved.',true);else showSaveModal('ok',reason);})
+   .then(function(){methodsDirty=false;updateMethodsSaveBar();briefsDirty=false;updateBriefsSaveBtn();if(quiet)showPop(reason||'Saved.',true);else showSaveModal('ok',reason);})
    .catch(function(e){if(quiet)showPop('Save failed — retry.',false);else showSaveModal('err',e.message);});
 }
 function cloudLoad(){
@@ -1913,9 +1925,9 @@ function toggleBrief(){briefOpen=!briefOpen;renderBriefBar();}
 function toggleNotes(){notesOpen=!notesOpen;renderNotesBar();if(notesOpen){var b=document.getElementById('r-notesbar');if(b)b.scrollIntoView({behavior:'smooth',block:'nearest'});}}
 function openSolver(){var el=document.getElementById('modeb-panel');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});else showPop('Solver is in the dashboard panel on the right.',true);}
 function activeBriefObj(){return briefsEditActive()?briefById(briefEditId):workingBrief;}
-function setBriefSingle(axis,val){var b=activeBriefObj();if(!b)return;b[axis]=(b[axis]===val?'':val);if(briefsEditActive())renderBriefsView();else{renderBriefBar();renderRecipe();}}
-function toggleBriefMulti(axis,val){var b=activeBriefObj();if(!b)return;var a=b[axis]||[];var i=a.indexOf(val);if(i>=0)a.splice(i,1);else a.push(val);b[axis]=a;if(briefsEditActive())renderBriefsView();else{renderBriefBar();renderRecipe();}}
-function setBriefDish(v){var b=activeBriefObj();if(!b)return;b.dish=v;if(briefsEditActive())renderBriefsView();else{var tag=document.getElementById('r-brieftag');if(tag&&briefIsSet(workingBrief))tag.textContent='\u2014 '+(v||briefSummary(workingBrief));}}
+function setBriefSingle(axis,val){var b=activeBriefObj();if(!b)return;b[axis]=(b[axis]===val?'':val);if(briefsEditActive()){markBriefsDirty();renderBriefsView();}else{renderBriefBar();renderRecipe();}}
+function toggleBriefMulti(axis,val){var b=activeBriefObj();if(!b)return;var a=b[axis]||[];var i=a.indexOf(val);if(i>=0)a.splice(i,1);else a.push(val);b[axis]=a;if(briefsEditActive()){markBriefsDirty();renderBriefsView();}else{renderBriefBar();renderRecipe();}}
+function setBriefDish(v){var b=activeBriefObj();if(!b)return;b.dish=v;if(briefsEditActive())markBriefsDirty();else{var tag=document.getElementById('r-brieftag');if(tag&&briefIsSet(workingBrief))tag.textContent='\u2014 '+(v||briefSummary(workingBrief));}}
 function saveBrief(){
   if(activeRecipeId){var r=recipeById(activeRecipeId);if(r){r.brief=briefIsSet(workingBrief)?JSON.parse(JSON.stringify(workingBrief)):null;cloudSave('Brief saved for \u201C'+r.name+'\u201D.');}}
   else showPop('Brief held \u2014 it attaches when you Save the recipe.',true);
@@ -1953,7 +1965,7 @@ function deleteBrewNote(i){
 }
 
 // ================= BRIEFS ENTITY + MODALS (v38) =================
-var BRIEFS=[], currentBriefId=null;
+var BRIEFS=[], currentBriefId=null, briefsDirty=false;
 function briefById(id){for(var i=0;i<BRIEFS.length;i++)if(BRIEFS[i].id===id)return BRIEFS[i];return null;}
 function newBriefObj(name,src){return {id:'b'+Date.now()+Math.floor(Math.random()*1000),name:name||'Untitled brief',dish:(src&&src.dish)||'',fat:(src&&src.fat)||'',intensity:(src&&src.intensity)||'',cooking:(src&&src.cooking)||'',taste:(src&&src.taste)?src.taste.slice():[],aroma:(src&&src.aroma)?src.aroma.slice():[],texture:(src&&src.texture)||''};}
 function migrateBriefs(){
@@ -1999,8 +2011,9 @@ function renderBriefsView(){
       '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn sm" onclick="duplicateBrief()">Duplicate</button><button class="btn sm" style="border-color:#E8312A;color:#E8312A;margin-left:auto;" onclick="deleteBrief()">Delete</button></div>'+
       '</div>';
   } else editor='<div class="brief-empty">Select a brief to edit, or create one.</div>';
-  v.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9a958a;">Briefs</div><button class="btn sm green" onclick="createBrief()">+ New brief</button></div>'+
+  v.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9a958a;">Briefs</div><div style="display:flex;gap:8px;"><button class="btn sm" onclick="createBrief()">+ New brief</button><button class="btn sm" id="briefs-save" onclick="saveBriefs()"></button></div></div>'+
     '<div style="display:flex;gap:22px;align-items:flex-start;"><div style="flex:0 0 300px;">'+list+'</div><div style="flex:1;min-width:0;">'+editor+'</div></div>';
+  updateBriefsSaveBtn();
 }
 function briefFieldsHtml(b){
   var saveB=workingBrief;workingBrief=b; var h=briefEditorHtml(); workingBrief=saveB; return h;
@@ -2010,7 +2023,9 @@ function editBrief(id){briefEditId=id;renderBriefsView();}
 function setBriefName(v){var b=briefById(briefEditId);if(b){b.name=v||'Untitled brief';renderBriefsView();markBriefsDirty();}}
 function duplicateBrief(){var b=briefById(briefEditId);if(!b)return;var c=newBriefObj(b.name+' copy',b);BRIEFS.push(c);briefEditId=c.id;renderBriefsView();markBriefsDirty();}
 function deleteBrief(){var b=briefById(briefEditId);if(!b)return;if(!confirm('Delete brief \u201C'+b.name+'\u201D? Recipes referencing it will lose the reference.'))return;SAVED.forEach(function(r){if(r.briefId===b.id)r.briefId=null;});BRIEFS=BRIEFS.filter(function(x){return x.id!==b.id;});if(currentBriefId===b.id){currentBriefId=null;workingBrief=emptyBrief();}briefEditId=null;renderBriefsView();markBriefsDirty();}
-function markBriefsDirty(){/* briefs persist on next cloudSave */}
+function markBriefsDirty(){briefsDirty=true;updateBriefsSaveBtn();}
+function updateBriefsSaveBtn(){var b=document.getElementById('briefs-save');if(!b)return;b.className='btn sm'+(briefsDirty?' green':'');b.disabled=!briefsDirty;b.innerHTML=briefsDirty?'&#10003; Save briefs':'Saved';}
+function saveBriefs(){if(!briefsDirty)return;cloudSave('Briefs saved.');}
 // brief editors edit the entity when in Briefs view
 function briefsEditActive(){return document.getElementById('view-briefs')&&document.getElementById('view-briefs').style.display!=='none'&&briefEditId;}
 // ---------- generic info modal (reuses #modal) ----------
