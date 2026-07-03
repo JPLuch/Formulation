@@ -436,7 +436,7 @@ var VOCAB={
 
 var INGREDIENTS_URL='ingredients.json'; // same-folder on GitHub Pages; set a full URL to host elsewhere
 var DB=[];  // loaded at startup from INGREDIENTS_URL
-var filter='all', flavourFilter='', layerFilter='', editIdx=null, working=null, previewMethod='Hot', previewDose=3;
+var filter='all', flavourFilter='', layerFilter='', editIdx=null, working=null, previewMethod='All', previewDose=3;
 var editorTarget='mbody', selectedIng=null;
 var RECIPE=[];
 
@@ -631,6 +631,44 @@ function famBoxes(family){
   }).join('')+'</div>';
 }
 function profileBars(components,method,dose){var p=computeUnder(components,method,dose);return barsFromLayer(p.layer)+famBoxes(p.family);}
+var METHOD_COL={Hot:'#E8A84A',Cold:'#1D9E75',N2O:'#7F77DD',CO2:'#378ADD'};
+function extractionChart(components,dose,filterMethod){
+  var showAll=!filterMethod;
+  var series=METHODS.map(function(m){var u=computeUnder(components,m,dose);return {m:m,vals:LAYERS.map(function(l){return u.layer[l]||0;}),fam:u.family};});
+  var allVals=[].concat.apply([],series.map(function(s){return s.vals;}));
+  var niceMax=Math.max(10,Math.ceil((Math.max.apply(null,allVals.concat([1]))*1.15)/10)*10);
+  var W=560,H=290,padL=32,padR=10,padT=30,padB=28;
+  var iw=W-padL-padR, ih=H-padT-padB;
+  function x(i){return padL+(i/(LAYERS.length-1))*iw;}
+  function y(v){return padT+ih-(v/niceMax)*ih;}
+  function poly(a){return a.map(function(v,i){return x(i)+','+y(v);}).join(' ');}
+  var steps=5,grid='',ylbls='';
+  for(var g=0;g<=steps;g++){
+    var gv=niceMax*g/steps,gy=y(gv);
+    grid+='<line x1="'+padL+'" y1="'+gy.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+gy.toFixed(1)+'" stroke="#efece4" stroke-width="1"/>';
+    ylbls+='<text x="'+(padL-6)+'" y="'+(gy+3).toFixed(1)+'" text-anchor="end" font-size="10" fill="#b4afa2">'+Math.round(gv)+'</text>';
+  }
+  var lines=series.map(function(s){
+    var on=showAll||s.m===filterMethod;if(!on)return '';
+    var col=METHOD_COL[s.m],op=showAll?0.55:1;
+    var area=(!showAll)?'<polygon points="'+x(0)+','+y(0)+' '+poly(s.vals)+' '+x(LAYERS.length-1)+','+y(0)+'" fill="'+col+'22"/>':'';
+    var line='<polyline points="'+poly(s.vals)+'" fill="none" stroke="'+col+'" stroke-width="2.5" opacity="'+op+'"/>';
+    var pts=s.vals.map(function(v,i){
+      var c='<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="3.5" fill="'+col+'" opacity="'+op+'"/>';
+      if(!showAll)c+='<text x="'+x(i).toFixed(1)+'" y="'+(y(v)-9).toFixed(1)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#0a0a0a">'+(Math.round(v*10)/10)+'</text>';
+      return c;
+    }).join('');
+    return area+line+pts;
+  }).join('');
+  var xlbls=LAYERS.map(function(l,i){return '<text x="'+x(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#6b675c">'+l+'</text>';}).join('');
+  var legend='<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px;">'+METHODS.map(function(m){
+    var dim=(!showAll&&m!==filterMethod);
+    return '<span style="display:inline-flex;align-items:center;gap:5px;'+(dim?'opacity:.35;':'')+'"><span style="width:9px;height:9px;border-radius:50%;background:'+METHOD_COL[m]+';display:inline-block;"></span><span style="font-size:10px;color:#8a8578;">'+METHOD_LABEL[m]+'</span></span>';
+  }).join('')+'</div>';
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;font-family:\'Space Mono\',monospace;">'+grid+ylbls+lines+xlbls+'</svg>';
+  var fam=filterMethod?famBoxes(series.filter(function(s){return s.m===filterMethod;})[0].fam):'';
+  return legend+svg+fam;
+}
 
 // ---- recipe ----
 function markDirty(){dirty=activeRecipeId?!itemsEqual(RECIPE,baselineItems):false;}
@@ -989,7 +1027,7 @@ function flavourVolumeData(items){
   var bn=Math.min(1,bodyScoreItems(items)/BODY_REF);
   function fv(bar){if(!bar)return v0;var gL=CO2_GL_PER_BAR*bar;var aromaSupp=Math.min(0.6,0.053*gL)*(1-0.6*bn);return nonAroma0+aroma0*(1-aromaSupp);}
   var bar=(items||[]).filter(function(it){return it.method==='Carbonation';}).reduce(function(s,it){return s+((it.set!=null&&it.set!=='')?+it.set:0);},0);
-  var ladder=[0,0.5,1,1.5,2,2.5,3].map(function(b){return {bar:b,gL:CO2_GL_PER_BAR*b,vol:fv(b)};});
+  var ladder=[0,1,2,3,4].map(function(b){return {bar:b,gL:CO2_GL_PER_BAR*b,vol:fv(b)};});
   return {v0:v0,bar:bar,current:fv(bar),ladder:ladder};
 }
 function fvZone(v){return v<100?'red':(v<=300?'green':(v<=400?'amber':'red'));}
@@ -1018,7 +1056,23 @@ function renderFlavourGauge(data,ghostCur,ghostLbl){
   var headline='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;"><div class="plabel" style="margin:0;">Flavour volume</div><div style="font-size:20px;font-weight:700;color:'+ZT[fvZone(cur)]+';">'+Math.round(cur)+' <span style="font-size:11px;color:#b4afa2;font-weight:400;">/ '+scaleMax+'</span></div></div>';
   var delta=Math.round(cur-v0);
   var summary=carbonated?'<div style="font-size:11px;color:#8a8578;margin-top:12px;">carbonated '+Math.round(cur)+' &middot; '+bar+' bar CO&#8322; '+(delta>=0?'+':'')+delta+' vs still '+Math.round(v0)+'</div>':'';
-  return headline+'<div style="flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;">'+gauge+summary+'</div>';
+  var ladderHtml='';
+  if(data.ladder&&data.ladder.length){
+    var curBarRounded=Math.round(bar),DOTC={red:'#E24B4A',green:'#1D9E75',amber:'#BA7517'};
+    ladderHtml='<div style="margin-top:14px;border-top:1px solid #efece4;padding-top:10px;">'+
+      '<div class="plabel" style="margin-bottom:6px;">Carbonation ladder</div>'+
+      data.ladder.map(function(L){
+        var isCur=L.bar===curBarRounded,z=fvZone(L.vol),lbl=L.bar===0?'Still':(L.bar+' bar');
+        return '<div style="display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:6px;font-size:11px;'+(isCur?'background:#faf6ef;box-shadow:inset 3px 0 0 #0a0a0a;':'')+'">'+
+          '<span style="width:8px;height:8px;border-radius:50%;background:'+DOTC[z]+';flex:0 0 auto;"></span>'+
+          '<span style="width:52px;color:'+(isCur?'#0a0a0a':'#8a8578')+';font-weight:'+(isCur?'700':'400')+';">'+lbl+'</span>'+
+          '<span style="font-weight:700;color:'+(isCur?'#0a0a0a':'#6b675c')+';">'+Math.round(L.vol)+'</span>'+
+          (isCur?'<span style="font-size:9px;color:#8a8578;margin-left:auto;">current</span>':'')+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }
+  return headline+'<div style="flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;">'+gauge+summary+'</div>'+ladderHtml;
 }
 function topNoteIn(notes,layers){
   var best=null,bv=0;
@@ -1346,7 +1400,7 @@ function blankComp(){return {name:'citrus',family:'aromatic','class':'volatile',
 function openNew(){
   editorTarget='mbody';selectedIng=null;
   working={id:'',name:'',category:'other',notes:'',components:[blankComp()],overdose:{sw:0,so:0,sa:0,bi:0,um:0},overdosePrimary:'',overdoseSecondary:''};
-  editIdx=null;previewMethod='Hot';previewDose=3;
+  editIdx=null;previewMethod='All';previewDose=3;
   document.getElementById('mtitle').textContent='New ingredient';
   document.getElementById('delbtn').style.display='none';
   renderModal();document.getElementById('modal').classList.add('show');
@@ -1355,7 +1409,7 @@ function openEdit(i){
   editorTarget='mbody';selectedIng=null;
   working=JSON.parse(JSON.stringify(DB[i]));
   if(!working.components)working.components=[];
-  editIdx=i;previewMethod='Hot';previewDose=3;
+  editIdx=i;previewMethod='All';previewDose=3;
   document.getElementById('mtitle').textContent=working.name;
   document.getElementById('delbtn').style.display='block';
   renderModal();document.getElementById('modal').classList.add('show');
@@ -1365,12 +1419,12 @@ function openEditDispatch(i){if(isDesktop())openEditInline(i);else openEdit(i);}
 function openNewDispatch(){if(isDesktop())openNewInline();else openNew();}
 function openEditInline(i){
   working=JSON.parse(JSON.stringify(DB[i]));if(!working.components)working.components=[];
-  editIdx=i;selectedIng=i;previewMethod='Hot';previewDose=3;editorTarget='ingdetail-body';
+  editIdx=i;selectedIng=i;previewMethod='All';previewDose=3;editorTarget='ingdetail-body';
   renderIngDetail(false);render();
 }
 function openNewInline(){
   working={id:'',name:'',category:'other',notes:'',components:[blankComp()],overdose:{sw:0,so:0,sa:0,bi:0,um:0},overdosePrimary:'',overdoseSecondary:''};
-  editIdx=null;selectedIng='new';previewMethod='Hot';previewDose=3;editorTarget='ingdetail-body';
+  editIdx=null;selectedIng='new';previewMethod='All';previewDose=3;editorTarget='ingdetail-body';
   renderIngDetail(true);render();
 }
 function renderIngDetail(isNew){
@@ -1410,7 +1464,7 @@ function renderModal(){
       '<div class="laygrid">'+cells+'</div></div>';
   }).join('');
   var catOpts=['tea','umami / marine','pungent / spice','floral / herb','fruit / citrus','root / seed / wood','functional / acid','other'];
-  var mtabs=METHODS.map(function(m){return '<button class="mtab '+(m===previewMethod?'on':'')+'" onclick="setPreview(\''+m+'\')">'+METHOD_LABEL[m]+'</button>';}).join(' ');
+  var mtabs=['All'].concat(METHODS).map(function(m){return '<button class="mtab '+(m===previewMethod?'on':'')+'" onclick="setPreview(\''+m+'\')">'+(m==='All'?'All':METHOD_LABEL[m])+'</button>';}).join(' ');
   var tgt=document.getElementById(editorTarget);if(!tgt)return;
   tgt.innerHTML=
     '<div class="frow"><div class="fld" style="flex:2;"><label class="flbl">Ingredient name</label><input class="finput" value="'+esc(w.name)+'" oninput="working.name=this.value"></div>'+
@@ -1419,15 +1473,15 @@ function renderModal(){
     '<div class="preview"><div class="plabel">Preview under extraction</div>'+
       '<div style="margin-bottom:10px;">'+mtabs+'</div>'+
       '<div class="dose-row"><span style="font-size:10px;color:#888;">DOSE</span><input type="range" min="0.5" max="12" step="0.5" value="'+previewDose+'" oninput="setDose(this.value)"><span style="font-size:11px;width:54px;" id="doselbl">'+previewDose+' g/L</span></div>'+
-      '<div id="prevbars">'+profileBars(w.components,previewMethod,previewDose)+'</div></div>'+
+      '<div id="prevbars">'+extractionChart(w.components,previewDose,previewMethod==='All'?null:previewMethod)+'</div></div>'+
     '<div class="fld"><label class="flbl">Flavour components &#8212; full potential (0&#8211;5 per layer)</label>'+compHtml+'<button class="btn sm" style="margin-top:6px;" onclick="addComp()">+ Add component</button></div>'+
     '<div class="fld"><label class="flbl">Overdose risk flags</label><div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;">'+
     ['sw','so','sa','bi','um'].map(function(k){var lbl={sw:'sweet',so:'sour',sa:'salty',bi:'bitter',um:'umami'}[k];return '<label style="display:flex;gap:4px;align-items:center;cursor:pointer;"><input type="checkbox" '+(w.overdose[k]?'checked':'')+' onchange="setOver(\''+k+'\',this.checked)">'+lbl+'</label>';}).join('')+'</div></div>'+
     '<div class="fld"><label class="flbl">Overdose &#8212; primary issue</label><input class="finput" value="'+esc(w.overdosePrimary)+'" oninput="working.overdosePrimary=this.value"></div>'+
     '<div class="fld"><label class="flbl">Overdose &#8212; secondary sensation</label><input class="finput" value="'+esc(w.overdoseSecondary)+'" oninput="working.overdoseSecondary=this.value"></div>';
 }
-function refreshPrev(){var el=document.getElementById('prevbars');if(el)el.innerHTML=profileBars(working.components,previewMethod,previewDose);}
-function setPreview(m){previewMethod=m;document.querySelectorAll('.mtab').forEach(function(b){b.classList.toggle('on',b.textContent===METHOD_LABEL[m]);});refreshPrev();}
+function refreshPrev(){var el=document.getElementById('prevbars');if(el)el.innerHTML=extractionChart(working.components,previewDose,previewMethod==='All'?null:previewMethod);}
+function setPreview(m){previewMethod=m;var lbl=m==='All'?'All':METHOD_LABEL[m];document.querySelectorAll('.mtab').forEach(function(b){b.classList.toggle('on',b.textContent===lbl);});refreshPrev();}
 function setDose(v){previewDose=parseFloat(v);document.getElementById('doselbl').textContent=previewDose+' g/L';refreshPrev();}
 function setComp(fi,val){var p=val.split('|');var c=working.components[fi];c.name=p[0];c.family=p[1];c['class']=classFor(p[1],p[0]);renderModal();}
 function setClass(fi,v){working.components[fi]['class']=v;renderModal();}
