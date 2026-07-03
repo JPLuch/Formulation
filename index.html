@@ -31,10 +31,10 @@ body{font-family:'Space Mono',monospace;background:#f7f6f2;color:#0a0a0a;max-wid
 .search{flex:1;min-width:160px;font-family:'Space Mono',monospace;font-size:12px;padding:8px 12px;border:1.5px solid #e8e6e0;background:#f7f6f2;}
 .search:focus{outline:none;border-color:#0a0a0a;}
 .fbar{padding:8px 18px;background:#fff;border-bottom:1.5px solid #e8e6e0;display:flex;gap:6px;flex-wrap:wrap;}
-.fchip{font-family:'Space Mono',monospace;font-size:10px;padding:4px 9px;border:1.5px solid #e8e6e0;background:#fff;cursor:pointer;text-transform:uppercase;}
+.fchip{font-family:'Space Mono',monospace;font-size:10px;padding:4px 9px;border:1.5px solid #e8e6e0;background:#fff;cursor:pointer;border-radius:2px;}
 .fchip.on{background:#0a0a0a;color:#fff;border-color:#0a0a0a;}
 .filterrow{padding:8px 18px;background:#fff;border-bottom:1.5px solid #e8e6e0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-.selfilter{font-family:'Space Mono',monospace;font-size:11px;padding:6px 8px;border:1.5px solid #e8e6e0;background:#fff;cursor:pointer;}
+.selfilter{font-family:'Space Mono',monospace;font-size:11px;padding:6px 8px;border:1.5px solid #e8e6e0;background:#fff;cursor:pointer;border-radius:6px;}
 .selfilter:focus{outline:none;border-color:#0a0a0a;}
 .list{padding:0 18px;}
 .row{padding:12px 0;border-bottom:1px solid #f0efe9;cursor:pointer;}
@@ -72,10 +72,10 @@ body{font-family:'Space Mono',monospace;background:#f7f6f2;color:#0a0a0a;max-wid
 .xbtn{font-size:11px;padding:3px 7px;border:1px solid #E8312A;color:#E8312A;background:#fff;cursor:pointer;margin-left:auto;}
 .xbtn:hover{background:#E8312A;color:#fff;}
 .mactions{display:flex;gap:8px;padding:16px 20px;border-top:1.5px solid #e8e6e0;position:sticky;bottom:0;background:#fff;}
-.preview{margin:14px 0;padding:14px;background:#f7f6f2;border-radius:4px;}
-.plabel{font-size:10px;font-weight:700;text-transform:uppercase;color:#888;letter-spacing:.05em;margin-bottom:10px;}
-.mtab{font-size:10px;font-weight:700;padding:5px 10px;border:1.5px solid #e8e6e0;background:#fff;cursor:pointer;text-transform:uppercase;}
-.mtab.on{background:#0a0a0a;color:#fff;border-color:#0a0a0a;}
+.preview{margin:14px 0;padding:15px 16px;background:#fff;border:1px solid #e8e6e0;border-radius:11px;box-shadow:0 1px 2px rgba(20,18,12,.03);}
+.plabel{font-size:10px;font-weight:700;text-transform:uppercase;color:#9a958a;letter-spacing:.1em;margin-bottom:10px;}
+.mtab{font-size:11px;font-weight:400;padding:6px 12px;border:1px solid #ddd9d0;background:#fff;color:#2c2a22;cursor:pointer;border-radius:6px;}
+.mtab.on{background:#0a0a0a;color:#fff;border-color:#0a0a0a;font-weight:700;}
 .save-pop{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0a0a0a;color:#fff;padding:14px 24px;border-radius:4px;font-size:12px;z-index:200;align-items:center;gap:12px;max-width:90%;}
 .save-pop.show{display:flex;}
 .save-pop .ok{color:#5DCAA5;}
@@ -205,6 +205,7 @@ body{height:100vh !important;overflow:hidden !important;padding:0 0 0 214px !imp
 .rcol-form .fn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
 .kpi-dot{display:inline-block;width:14px;height:14px;border-radius:50%;flex:0 0 auto;}
 .kpi-zone{font-size:9px;margin-top:5px;letter-spacing:.04em;}
+.kpi-ghost{font-size:9px;color:#aaa;margin-top:2px;}
 .rcol-charts{flex:1 !important;min-width:0;height:100%;overflow-y:auto;padding:18px 22px 60px !important;background:#f4f3ee !important;}
 .rcol-charts #r-results{position:static !important;padding:0 !important;}
 #view-ing,#view-meth,#view-briefs{height:100vh;overflow-y:auto;padding:22px 26px 60px;}
@@ -226,7 +227,6 @@ body{height:100vh !important;overflow:hidden !important;padding:0 0 0 214px !imp
 .kpi-val{font-size:26px;font-weight:700;line-height:1;}
 .kpi-cap{font-size:9px;color:#b4afa2;margin-top:3px;}
 .kpi-ring{width:46px;height:46px;flex:0 0 auto;}
-.dcard .plabel{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9a958a;margin-bottom:10px;font-weight:700;}
 .dcard .chartbox{background:transparent !important;border:none !important;}
 .dcard .bigmove{font-size:11px;color:#6b675c;}
 .dcard #modeb-panel{margin-top:0 !important;border-top:none !important;padding-top:0 !important;}
@@ -993,11 +993,11 @@ function flavourVolumeData(items){
   return {v0:v0,bar:bar,current:fv(bar),ladder:ladder};
 }
 function fvZone(v){return v<100?'red':(v<=300?'green':(v<=400?'amber':'red'));}
-function renderFlavourGauge(data){
+function renderFlavourGauge(data,ghostCur,ghostLbl){
   var v0=data.v0,cur=data.current,bar=data.bar;
   if(v0<=0)return '';
   var Z={red:'#F1B2B2',green:'#B7D98A',amber:'#F5C36B'},ZT={red:'#791F1F',green:'#27500A',amber:'#633806'};
-  var scaleMax=Math.max(340,Math.ceil(Math.max(v0,cur)/50)*50+40);
+  var scaleMax=Math.max(340,Math.ceil(Math.max(v0,cur,ghostCur||0)/50)*50+40);
   function pct(v){return Math.min(100,v/scaleMax*100);}
   var segs=[[100,Z.red],[300,Z.green],[400,Z.amber],[scaleMax,Z.red]],prev=0;
   var segHtml=segs.map(function(s){var w=(Math.min(s[0],scaleMax)-prev)/scaleMax*100;prev=s[0];return w>0?'<div style="width:'+w+'%;background:'+s[1]+';"></div>':'';}).join('');
@@ -1006,8 +1006,15 @@ function renderFlavourGauge(data){
   var anchor=mp>82?'right:0;left:auto;transform:none;text-align:right;':(mp<12?'left:0;transform:none;text-align:left;':'left:'+mp+'%;transform:translateX(-50%);text-align:center;');
   var marker='<div style="position:absolute;'+anchor+'top:-22px;"><div style="font-size:11px;font-weight:700;color:#0a0a0a;line-height:1;">'+Math.round(cur)+'</div></div>'+
              '<div style="position:absolute;left:'+mp+'%;top:-6px;transform:translateX(-50%);"><div style="width:2px;height:26px;background:#0a0a0a;"></div></div>';
+  var ghostMarker='';
+  if(ghostCur!=null){
+    var gmp=pct(ghostCur);
+    var ganchor=gmp>82?'right:0;left:auto;transform:none;text-align:right;':(gmp<12?'left:0;transform:none;text-align:left;':'left:'+gmp+'%;transform:translateX(-50%);text-align:center;');
+    ghostMarker='<div style="position:absolute;'+ganchor+'top:-34px;"><div style="font-size:9px;font-weight:700;color:#8a8578;line-height:1;white-space:nowrap;">'+esc(ghostLbl||'ghost')+' '+Math.round(ghostCur)+'</div></div>'+
+      '<div style="position:absolute;left:'+gmp+'%;top:-6px;transform:translateX(-50%);"><div style="width:2px;height:26px;background:#8a8578;opacity:.5;"></div></div>';
+  }
   var ticks='<div style="position:relative;height:14px;font-size:9px;color:#b4afa2;margin-top:6px;"><span style="position:absolute;left:0;">0</span><span style="position:absolute;left:'+pct(100)+'%;transform:translateX(-50%);">100</span><span style="position:absolute;left:'+pct(300)+'%;transform:translateX(-50%);">300</span><span style="position:absolute;right:0;">'+scaleMax+'</span></div>';
-  var gauge='<div style="position:relative;margin:28px 0 2px;"><div style="display:flex;height:18px;border-radius:5px;overflow:hidden;">'+segHtml+'</div>'+marker+ticks+'</div>';
+  var gauge='<div style="position:relative;margin:'+(ghostCur!=null?40:28)+'px 0 2px;"><div style="display:flex;height:18px;border-radius:5px;overflow:hidden;">'+segHtml+'</div>'+ghostMarker+marker+ticks+'</div>';
   var headline='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;"><div class="plabel" style="margin:0;">Flavour volume</div><div style="font-size:20px;font-weight:700;color:'+ZT[fvZone(cur)]+';">'+Math.round(cur)+' <span style="font-size:11px;color:#b4afa2;font-weight:400;">/ '+scaleMax+'</span></div></div>';
   var delta=Math.round(cur-v0);
   var summary=carbonated?'<div style="font-size:11px;color:#8a8578;margin-top:12px;">carbonated '+Math.round(cur)+' &middot; '+bar+' bar CO&#8322; '+(delta>=0?'+':'')+delta+' vs still '+Math.round(v0)+'</div>':'';
@@ -1070,18 +1077,21 @@ function kpiZone(kind,v){
   return v<b[0]?[A,'thin/absent']:(v<b[1]?[G,'balanced']:(v<b[2]?[G,'forward']:[R,'very loud']));
 }
 function kpiDot(color){return '<span class="kpi-dot" style="background:'+color+';box-shadow:0 0 0 4px '+color+'22;"></span>';}
-function kpiCards(res){
+function kpiCards(res,ghostRes,ghostItems,ghostLbl){
   var fv=flavourVolumeData(RECIPE), body=bodyScoreItems(RECIPE);
+  var gfv=ghostItems?flavourVolumeData(ghostItems):null;
+  var gbody=ghostItems?bodyScoreItems(ghostItems):null;
   var cards=[
-    ['Flavour volume',fv.current,'vol'],
-    ['Body',body,'body'],
-    ['Taste',res.family.taste||0,'taste'],
-    ['Triggers',res.family.trigeminal||0,'trigeminal'],
-    ['Aroma',res.family.aromatic||0,'aromatic']
+    ['Flavour volume',fv.current,'vol',gfv?gfv.current:(ghostRes?LAYERS.reduce(function(s,l){return s+(ghostRes.layer[l]||0);},0):null)],
+    ['Body',body,'body',gbody],
+    ['Taste',res.family.taste||0,'taste',ghostRes?(ghostRes.family.taste||0):null],
+    ['Triggers',res.family.trigeminal||0,'trigeminal',ghostRes?(ghostRes.family.trigeminal||0):null],
+    ['Aroma',res.family.aromatic||0,'aromatic',ghostRes?(ghostRes.family.aromatic||0):null]
   ];
   return '<div class="kpirow">'+cards.map(function(c){
     var z=kpiZone(c[2],c[1]); var shown=(c[0]==='Body')?(Math.round(c[1]*10)/10):Math.round(c[1]);
-    return '<div class="kpicard"><div class="kpi-l"><div class="kpi-lbl">'+c[0]+'</div><div class="kpi-val">'+shown+'</div><div class="kpi-zone" style="color:'+z[0]+';">'+z[1]+'</div></div>'+kpiDot(z[0])+'</div>';
+    var ghost=(c[3]!=null)?'<div class="kpi-ghost" title="'+esc(ghostLbl||'ghost')+'">vs '+(c[0]==='Body'?(Math.round(c[3]*10)/10):Math.round(c[3]))+'</div>':'';
+    return '<div class="kpicard"><div class="kpi-l"><div class="kpi-lbl">'+c[0]+'</div><div class="kpi-val">'+shown+'</div><div class="kpi-zone" style="color:'+z[0]+';">'+z[1]+'</div>'+ghost+'</div>'+kpiDot(z[0])+'</div>';
   }).join('')+'</div>';
 }
 function renderRecipe(){
@@ -1143,6 +1153,7 @@ function renderRecipe(){
   var baseRes=hasBrief?briefRes:(verGhost?computeItems(baselineItems):null);
   var ghostMode=hasBrief?'brief':(verGhost?'version':null);
   if(compareRecipeId){var _cr=recipeById(compareRecipeId);if(_cr){baseRes=computeItems(currentItems(_cr));ghostMode='compare';}else{compareRecipeId=null;}}
+  var ghostItems=ghostMode==='version'?baselineItems:(ghostMode==='compare'&&_cr?currentItems(_cr):null);
   var noteList=Object.keys(res.notes).map(function(n){return {n:n,t:res.notes[n].total,f:res.notes[n].family};}).filter(function(o){return o.t>0.05;}).sort(function(a,b){return b.t-a.t;});
   var warn=res.warnings.length?'<div class="warn"><b>Watch:</b><br>'+res.warnings.join('<br>')+'</div>':'';
 
@@ -1175,14 +1186,14 @@ function renderRecipe(){
   var tempLbl=ghostMode?' <span style="color:#aaa;font-weight:400;">(pink = '+(ghostMode==='compare'?esc(compareName()):'now')+', grey = '+(ghostMode==='compare'?'now':gLbl)+')</span>':'';
   document.getElementById('r-results').innerHTML=
     '<div class="headline">'+headline(res)+'</div>'+
-    kpiCards(res)+
+    kpiCards(res,baseRes,ghostItems,gLbl)+
     '<div class="dgrid-tt">'+
       '<div class="dcard"><div class="plabel">Temporal shape</div><div style="display:flex;align-items:center;min-height:230px;">'+temporalSVG(res,baseRes,recipeNm,gLbl)+'</div></div>'+
       '<div class="dcard"><div class="plabel">Taste profile</div><div class="chartbox" style="height:250px;"><canvas id="rc-taste"></canvas></div></div>'+
     '</div>'+
     '<div class="dgrid2">'+
       '<div class="dcard"><div class="plabel">Tasting arc &mdash; when notes arrive</div>'+chartLegendArc(noteList.slice(0,5))+(ghostChart?lineStyleLegend(recipeNm,ghostChartLbl):'')+'<div class="chartbox" style="height:220px;"><canvas id="rc-arc"></canvas></div></div>'+
-      '<div class="dcard" style="display:flex;flex-direction:column;">'+renderFlavourGauge(flavourVolumeData(RECIPE))+'</div>'+
+      '<div class="dcard" style="display:flex;flex-direction:column;">'+renderFlavourGauge(flavourVolumeData(RECIPE),(function(){if(ghostItems)return flavourVolumeData(ghostItems).current;if(baseRes)return LAYERS.reduce(function(s,l){return s+(baseRes.layer[l]||0);},0);return null;})(),gLbl)+'</div>'+
     '</div>'+
     '<div class="dcard"><div class="plabel">Flavour by intensity</div><div class="chartbox" id="rc-barbox"><canvas id="rc-bar"></canvas></div></div>'+
     (fitDiff?'<div class="dcard">'+fitDiff+'</div>':'')+
