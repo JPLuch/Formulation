@@ -243,6 +243,23 @@ body{height:100vh !important;overflow:hidden !important;padding:0 0 0 214px !imp
 .row.sel{background:#fbf4f0;border-color:#ddd9d0;box-shadow:inset 3px 0 0 #E8312A;}
 .ftag{border-radius:4px;}
 #briefs-save:disabled{opacity:.55;cursor:default;}
+/* ---- dish model viz (brief editor) ---- */
+.dm-sec{margin-top:14px;padding-top:12px;border-top:1px solid #efece4;}
+.dm-row{display:flex;align-items:center;gap:10px;padding:3px 0;}
+.dm-lbl{flex:0 0 70px;font-size:9px;color:#6b675c;text-transform:uppercase;letter-spacing:.06em;}
+.dm-cells{display:flex;gap:3px;}
+.dm-cell{width:26px;height:11px;border-radius:3px;background:#efece4;cursor:pointer;}
+.dm-cell:hover{background:#dedad0;}
+.dm-cell.on{background:#2c2a22;}
+.dm-cell.on:hover{background:#2c2a22;}
+.dm-cell.ro,.dm-cell.ro:hover{cursor:default;}
+.dm-row.tgt .dm-cell.on{background:#1D9E75;}
+.dm-row.tgt .dm-cell:hover{background:#efece4;}
+.dm-row.tgt .dm-cell.on:hover{background:#1D9E75;}
+.dm-word{font-size:9px;color:#9a958a;min-width:34px;}
+.dm-adj{font-size:8px;color:#E8312A;text-transform:uppercase;letter-spacing:.05em;}
+.dm-note{font-size:10px;color:#9a958a;margin-top:6px;line-height:1.5;}
+.dm-echo{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
 /* formula column polish */
 .rcol-form .bhdr,.rcol-form .batch-hdr{margin-top:4px;}
 </style>
@@ -459,7 +476,7 @@ var BURL='https://api.jsonbin.io/v3/b/'+BIN;
 var SAVED=[];
 var activeRecipeId=null, baselineItems=[], dirty=false, historyOpen=false, briefOpen=false, notesOpen=false;
 var workingBrief=null;
-function emptyBrief(){return {dish:"",fat:"",intensity:"",cooking:"",taste:[],aroma:[],texture:""};}
+function emptyBrief(){return {dish:"",fat:"",intensity:"",cooking:"",taste:[],aroma:[],texture:"",base:"",sauce:"",heat:"",adj:{}};}
 
 // ---- ingredients required by seeded recipes, merged in at startup ----
 var EXTRA_INGREDIENTS=[
@@ -1807,8 +1824,9 @@ var BAND_WORD=['none','low','med','high','max'];
 var AXIS_LBL={intensity:'intensity',sour:'acidity',sweet:'sweetness',bitter:'bitterness',umami:'umami',astringent:'astringency',aromatic:'aromatics',finish:'finish'};
 function bucket(v,edges){var b=0;for(var i=0;i<edges.length;i++){if(v>edges[i])b++;}return b;}
 function bandCenter(edges,b){if(b<=0)return edges[0]*0.5;if(b>=4)return edges[3]*1.3;return (edges[b-1]+edges[b])/2;}
-function briefIsSet(br){return !!(br&&(br.fat||br.intensity||br.cooking||(br.taste&&br.taste.length)||(br.aroma&&br.aroma.length)||br.texture));}
+function briefIsSet(br){return !!(br&&(isDishBrief(br)||br.fat||br.intensity||br.cooking||(br.taste&&br.taste.length)||(br.aroma&&br.aroma.length)||br.texture));}
 function briefTarget(br){
+  if(isDishBrief(br))return targetFromDish(deriveDish(br));
   var t={intensity:2,sweet:1,sour:1,salty:0,bitter:1,umami:0,astringent:1,aromatic:1,finish:1},echo={};
   function bump(k,n){t[k]=Math.min(4,Math.max(0,t[k]+n));}
   function ec(n,b){echo[n]=Math.max(echo[n]||0,b);}
@@ -1859,7 +1877,13 @@ function briefGhost(target){
   LAYERS.forEach(function(l){layer[l]=intC*(w[l]/sw);});
   return {notes:notes,layer:layer,family:{taste:0,trigeminal:0,aromatic:bandCenter(BAND_EDGES.aromatic,target.bands.aromatic)}};
 }
-function briefSummary(br){var p=[br.fat,br.intensity,br.cooking].filter(Boolean).concat(br.taste||[]).concat(br.aroma||[]);return p.join(' \u00B7 ')||'unset';}
+function briefSummary(br){
+  if(isDishBrief(br)){
+    var h=HEAT_LEVELS.indexOf(br.heat||'none');
+    var p=[br.base,br.cooking,(br.sauce&&br.sauce.indexOf('none')<0?br.sauce:null),(h>0?br.heat+' heat':null)].filter(Boolean);
+    return p.join(' \u00B7 ')||'unset';
+  }
+  var p=[br.fat,br.intensity,br.cooking].filter(Boolean).concat(br.taste||[]).concat(br.aroma||[]);return p.join(' \u00B7 ')||'unset';}
 function deriveFoodFromDrink(res){
   var v=recipeAxisValues(res),b=function(a){return bucket(v[a],BAND_EDGES[a]);},cues=[];
   if(b('sour')>=3||b('astringent')>=3)cues.push('rich, fatty or fried food \u2014 acidity/astringency cuts fat');
@@ -1889,6 +1913,83 @@ var BRIEF_OPTS={
   aroma:['herbal','spiced','citrus','earthy','floral','clean'],
   texture:['crisp','tender','juicy','coating']
 };
+// ---- dish-model brief (v43): describe the plate, derive the sensory model ----
+// Attribute scale 0-4 = none/low/med/high/max (BAND_WORD). Templates are bench-tunable guesses.
+var DISH_BASE={
+  'white fish':{weight:1,fat:1,salt:1,sweet:0,sour:0,umami:1,bitter:0,corr:'marine'},
+  'oily fish':{weight:2,fat:3,salt:1,sweet:0,sour:0,umami:2,bitter:0,corr:'marine'},
+  'shellfish':{weight:1,fat:1,salt:2,sweet:1,sour:0,umami:2,bitter:0,corr:'marine'},
+  'poultry':{weight:2,fat:2,salt:1,sweet:0,sour:0,umami:1,bitter:0},
+  'pork':{weight:2,fat:3,salt:2,sweet:1,sour:0,umami:2,bitter:0},
+  'red meat':{weight:3,fat:3,salt:1,sweet:0,sour:0,umami:2,bitter:0},
+  'offal / game':{weight:3,fat:2,salt:1,sweet:0,sour:0,umami:3,bitter:2,corr:'iron'},
+  'cheese':{weight:3,fat:3,salt:2,sweet:0,sour:1,umami:3,bitter:0},
+  'egg':{weight:2,fat:2,salt:1,sweet:0,sour:0,umami:1,bitter:0},
+  'vegetable':{weight:1,fat:0,salt:0,sweet:1,sour:0,umami:1,bitter:1},
+  'dessert':{weight:2,fat:2,salt:0,sweet:4,sour:1,umami:0,bitter:0}
+};
+var DISH_COOK={
+  'raw':{sour:1},
+  'poached':{},
+  'fried':{fat:1,salt:1},
+  'seared':{bitter:1,echo:{woody:2}},
+  'grilled':{bitter:1,echo:{smoky:3,woody:2}},
+  'roasted':{sweet:1,echo:{woody:3,smoky:2}},
+  'braised':{umami:1,weight:1,echo:{earthy:2}}
+};
+var DISH_SAUCE={
+  'none / dry':{},
+  'butter / cream':{fat:2},
+  'citrus / vinaigrette':{sour:2},
+  'tomato':{sour:2,umami:1,sweet:1},
+  'soy / fermented':{salt:2,umami:2},
+  'pan jus / brown':{umami:1,fat:1},
+  'sweet glaze / bbq':{sweet:2,echo:{smoky:1}},
+  'herb / salsa verde':{sour:1,echo:{herbal:3}}
+};
+var HEAT_LEVELS=['none','mild','medium','hot','fiery'];
+var DISH_AXES=['weight','fat','salt','sweet','sour','umami','bitter'];
+var DISH_CORR_LBL={marine:'marine — astringency capped (fish oils + tannin turn metallic)',iron:'iron — bitterness welcome, acid up (offal/game)'};
+function isDishBrief(br){
+  return !!(br&&((br.base&&DISH_BASE[br.base])||(br.sauce&&DISH_SAUCE[br.sauce])||(br.heat&&HEAT_LEVELS.indexOf(br.heat)>0)||(br.adj&&Object.keys(br.adj).length)||br.cooking==='fried'||br.cooking==='braised'));
+}
+function deriveDish(br){
+  var base=DISH_BASE[br.base]||null,a={},echo={},corr=[];
+  DISH_AXES.forEach(function(x){a[x]=base?(base[x]||0):0;});
+  if(!base)a.weight=2;
+  if(base&&base.corr)corr.push(base.corr);
+  [DISH_COOK[br.cooking],DISH_SAUCE[br.sauce]].forEach(function(m){
+    if(!m)return;
+    DISH_AXES.forEach(function(x){if(m[x])a[x]+=m[x];});
+    if(m.echo)Object.keys(m.echo).forEach(function(n){echo[n]=Math.max(echo[n]||0,m.echo[n]);});
+  });
+  a.heat=Math.max(0,HEAT_LEVELS.indexOf(br.heat||'none'));
+  var adj=br.adj||{},over={};
+  Object.keys(adj).forEach(function(x){if(adj[x]!=null&&DISH_AXES.indexOf(x)>=0){a[x]=adj[x];over[x]=true;}});
+  DISH_AXES.concat(['heat']).forEach(function(x){a[x]=Math.max(0,Math.min(4,a[x]));});
+  return {attrs:a,echo:echo,corr:corr,over:over};
+}
+function targetFromDish(d){
+  var a=d.attrs,t={intensity:2,sweet:1,sour:1,salty:0,bitter:1,umami:0,astringent:1,aromatic:1,finish:1},echo={};
+  function bump(k,n){t[k]=Math.min(4,Math.max(0,t[k]+n));}
+  function ec(n,b){echo[n]=Math.max(echo[n]||0,b);}
+  t.intensity=Math.max(1,Math.min(4,a.weight));            // match the dish's weight
+  if(a.fat>=2)bump('sour',1);if(a.fat>=4)bump('sour',1);    // acid cuts fat
+  if(a.fat>=3){bump('astringent',1);bump('finish',1);}
+  if(a.sweet>t.sweet)t.sweet=a.sweet;                       // drink at least as sweet as the dish
+  if(a.sour>t.sour)t.sour=a.sour;                           // drink at least as acidic as the dish
+  if(a.salt>=2)bump('sour',1);                              // salt flatters acidity
+  if(a.umami>=2)bump('umami',1);
+  if(a.umami>=3){bump('umami',1);bump('sour',1);t.astringent=Math.min(t.astringent,1);} // umami amplifies tannin
+  if(a.bitter>=2)bump('aromatic',1);
+  if(a.heat>=2){bump('sweet',1);t.astringent=Math.min(t.astringent,1);ec('citrus',2);}  // sweet soothes heat
+  if(a.heat>=3){bump('sweet',1);t.bitter=Math.min(t.bitter,1);ec('herbal',2);}          // astringent/bitter scour it
+  Object.keys(d.echo).forEach(function(n){ec(n,d.echo[n]);});
+  if(d.corr.indexOf('marine')>=0)t.astringent=Math.min(t.astringent,1);
+  if(d.corr.indexOf('iron')>=0){bump('bitter',1);bump('sour',1);}
+  bump('aromatic',Math.ceil(Object.keys(echo).length/2));
+  return {bands:t,echo:echo,heat:a.heat};
+}
 var compareRecipeId=null;
 function setCompare(id){compareRecipeId=id||null;renderRecipe();}
 function renderCompareBar(){
@@ -1967,7 +2068,7 @@ function deleteBrewNote(i){
 // ================= BRIEFS ENTITY + MODALS (v38) =================
 var BRIEFS=[], currentBriefId=null, briefsDirty=false;
 function briefById(id){for(var i=0;i<BRIEFS.length;i++)if(BRIEFS[i].id===id)return BRIEFS[i];return null;}
-function newBriefObj(name,src){return {id:'b'+Date.now()+Math.floor(Math.random()*1000),name:name||'Untitled brief',dish:(src&&src.dish)||'',fat:(src&&src.fat)||'',intensity:(src&&src.intensity)||'',cooking:(src&&src.cooking)||'',taste:(src&&src.taste)?src.taste.slice():[],aroma:(src&&src.aroma)?src.aroma.slice():[],texture:(src&&src.texture)||''};}
+function newBriefObj(name,src){return {id:'b'+Date.now()+Math.floor(Math.random()*1000),name:name||'Untitled brief',dish:(src&&src.dish)||'',fat:(src&&src.fat)||'',intensity:(src&&src.intensity)||'',cooking:(src&&src.cooking)||'',taste:(src&&src.taste)?src.taste.slice():[],aroma:(src&&src.aroma)?src.aroma.slice():[],texture:(src&&src.texture)||'',base:(src&&src.base)||'',sauce:(src&&src.sauce)||'',heat:(src&&src.heat)||'',adj:(src&&src.adj)?JSON.parse(JSON.stringify(src.adj)):{}};}
 function migrateBriefs(){
   // legacy: recipes carried an embedded .brief object. Promote each to a standalone entity + briefId.
   SAVED.forEach(function(r){
@@ -2007,7 +2108,7 @@ function renderBriefsView(){
     var b=briefById(briefEditId);
     if(b)editor='<div class="brief-editor">'+
       '<input class="finput" id="brief-name" value="'+esc(b.name)+'" onchange="setBriefName(this.value)" style="font-size:16px;font-weight:700;width:100%;margin-bottom:12px;">'+
-      briefFieldsHtml(b)+
+      dishEditorHtml(b)+
       '<div style="display:flex;gap:8px;margin-top:14px;"><button class="btn sm" onclick="duplicateBrief()">Duplicate</button><button class="btn sm" style="border-color:#E8312A;color:#E8312A;margin-left:auto;" onclick="deleteBrief()">Delete</button></div>'+
       '</div>';
   } else editor='<div class="brief-empty">Select a brief to edit, or create one.</div>';
@@ -2017,6 +2118,56 @@ function renderBriefsView(){
 }
 function briefFieldsHtml(b){
   var saveB=workingBrief;workingBrief=b; var h=briefEditorHtml(); workingBrief=saveB; return h;
+}
+// ---- dish-model editor (v43) ----
+function dishPickRow(lbl,field,opts,b){
+  return '<div class="brieflbl">'+lbl+'</div><div>'+opts.map(function(o){
+    return '<button class="bchip'+(b[field]===o?' on':'')+'" onclick="setBriefPick(\''+field+'\',\''+o+'\')">'+o+'</button>';}).join('')+'</div>';
+}
+function setBriefPick(field,val){var b=briefById(briefEditId);if(!b)return;b[field]=(b[field]===val?'':val);markBriefsDirty();renderBriefsView();}
+function setBriefAdj(axis,v){
+  var b=briefById(briefEditId);if(!b)return;b.adj=b.adj||{};
+  delete b.adj[axis];
+  var pure=deriveDish(b).attrs[axis];
+  if(v!==pure)b.adj[axis]=Math.max(0,Math.min(4,v));
+  markBriefsDirty();renderBriefsView();
+}
+function dmRowHtml(lbl,axis,v,o){
+  var cells='';
+  for(var L=1;L<=4;L++){
+    var click=o.ro?'':' onclick="setBriefAdj(\''+axis+'\','+(L===v?(L-1):L)+')"';
+    cells+='<span class="dm-cell'+(v>=L?' on':'')+(o.ro?' ro':'')+'"'+click+'></span>';
+  }
+  return '<div class="dm-row'+(o.tgt?' tgt':'')+'"><span class="dm-lbl">'+lbl+'</span><div class="dm-cells">'+cells+'</div><span class="dm-word">'+(axis==='heat'?HEAT_LEVELS[v]:BAND_WORD[v])+'</span>'+(o.adj?'<span class="dm-adj">adjusted</span>':'')+'</div>';
+}
+function dishModelHtml(b){
+  var d=deriveDish(b);
+  var rows=[['weight','Weight'],['fat','Fat'],['heat','Heat'],['salt','Salt'],['sweet','Sweet'],['sour','Sour'],['umami','Umami'],['bitter','Bitter']].map(function(r){
+    return dmRowHtml(r[1],r[0],d.attrs[r[0]],{adj:!!d.over[r[0]],ro:r[0]==='heat'});
+  }).join('');
+  var ech=Object.keys(d.echo).map(function(n){return '<span class="ftag ft-aromatic">'+n+' '+BAND_WORD[d.echo[n]]+'</span>';}).join('');
+  var corr=d.corr.map(function(c){return '<div class="dm-note">&#9888; '+DISH_CORR_LBL[c]+'</div>';}).join('');
+  return '<div class="dm-sec"><div class="plabel" style="margin-bottom:6px;">Dish model <span style="font-weight:400;color:#b4afa2;text-transform:none;letter-spacing:0;">&mdash; click a bar to override</span></div>'+rows+
+    (ech?'<div class="dm-echo">'+ech+'</div>':'')+corr+'</div>';
+}
+function drinkTargetHtml(b){
+  if(!briefIsSet(b))return '<div class="dm-sec"><div class="dm-note">Pick base / cooking / sauce / heat to see the drink target.</div></div>';
+  var tgt=briefTarget(b);
+  var axes=['intensity','sweet','sour','bitter','umami','astringent','aromatic','finish'];
+  var rows=axes.map(function(a){return dmRowHtml(AXIS_LBL[a],a,tgt.bands[a],{ro:true,tgt:true});}).join('');
+  var ech=Object.keys(tgt.echo).filter(function(n){return tgt.echo[n]>=2;}).map(function(n){return '<span class="ftag ft-aromatic">echo: '+n+'</span>';}).join('');
+  var heatNote=(tgt.heat>=3)?'<div class="dm-note">&#9888; hot dish &mdash; keep carbonation low; bubbles scour capsaicin across the palate.</div>':'';
+  return '<div class="dm-sec"><div class="plabel" style="margin-bottom:6px;">Drink target</div>'+rows+(ech?'<div class="dm-echo">'+ech+'</div>':'')+heatNote+'</div>';
+}
+function dishEditorHtml(b){
+  var legacy=!isDishBrief(b)&&(b.fat||b.intensity||(b.taste&&b.taste.length)||(b.aroma&&b.aroma.length)||b.texture);
+  return '<div class="brieflbl">dish</div><input class="finput" style="margin-bottom:4px;" value="'+esc(b.dish||'')+'" oninput="setBriefDish(this.value)" placeholder="e.g. grilled mackerel, salsa verde">'+
+    dishPickRow('base / protein','base',Object.keys(DISH_BASE),b)+
+    dishPickRow('cooking','cooking',Object.keys(DISH_COOK),b)+
+    dishPickRow('sauce / finish','sauce',Object.keys(DISH_SAUCE),b)+
+    dishPickRow('heat','heat',HEAT_LEVELS,b)+
+    (legacy?'<div class="dm-note">Legacy brief &mdash; its old tag settings still drive the target until you pick options above.</div>':'')+
+    dishModelHtml(b)+drinkTargetHtml(b);
 }
 function createBrief(){var b=newBriefObj('New brief');BRIEFS.push(b);briefEditId=b.id;renderBriefsView();markBriefsDirty();}
 function editBrief(id){briefEditId=id;renderBriefsView();}
