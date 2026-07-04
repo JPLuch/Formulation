@@ -1932,7 +1932,7 @@ var DISH_BASE={
 var DISH_COOK={
   'raw':{sour:1},
   'poached':{},
-  'fried':{fat:1,salt:1},
+  'fried':{weight:1,fat:1,salt:1},
   'seared':{bitter:1,echo:{woody:2}},
   'grilled':{bitter:1,echo:{smoky:3,woody:2}},
   'roasted':{sweet:1,echo:{woody:3,smoky:2}},
@@ -1983,8 +1983,8 @@ function targetFromDish(d){
   if(a.umami>=2)bump('umami',1);
   if(a.umami>=3){bump('umami',1);bump('sour',1);t.astringent=Math.min(t.astringent,1);} // umami amplifies tannin
   if(a.bitter>=2)bump('aromatic',1);
-  if(a.heat>=2){bump('sweet',1);t.astringent=Math.min(t.astringent,1);ec('citrus',2);}  // sweet soothes heat
-  if(a.heat>=3){bump('sweet',1);t.bitter=Math.min(t.bitter,1);ec('herbal',2);}          // astringent/bitter scour it
+  if(a.heat>=2){bump('sweet',1);t.astringent=Math.min(t.astringent,1);ec('citrus',1);}  // sweet soothes heat; cooling echo is a hint (level 1 = unscored)
+  if(a.heat>=3){bump('sweet',1);t.bitter=Math.min(t.bitter,1);ec('herbal',1);}          // astringent/bitter scour it
   Object.keys(d.echo).forEach(function(n){ec(n,d.echo[n]);});
   if(d.corr.indexOf('marine')>=0)t.astringent=Math.min(t.astringent,1);
   if(d.corr.indexOf('iron')>=0){bump('bitter',1);bump('sour',1);}
@@ -2240,7 +2240,7 @@ function drinkTargetHtml(b){
   var tgt=briefTarget(b);
   var axes=['intensity','sweet','sour','bitter','umami','astringent','aromatic','finish'];
   var rows=axes.map(function(a){return dmRowHtml(AXIS_LBL[a],a,tgt.bands[a],{ro:true,tgt:true});}).join('');
-  var ech=Object.keys(tgt.echo).filter(function(n){return tgt.echo[n]>=2;}).map(function(n){return '<span class="ftag ft-aromatic">echo: '+n+'</span>';}).join('');
+  var ech=Object.keys(tgt.echo).map(function(n){return '<span class="ftag ft-aromatic">echo: '+n+(tgt.echo[n]>=2?'':' (soft)')+'</span>';}).join('');
   var heatNote=(tgt.heat>=3)?'<div class="dm-note">&#9888; hot dish &mdash; keep carbonation low; bubbles scour capsaicin across the palate.</div>':'';
   return '<div class="dm-sec"><div class="plabel" style="margin-bottom:6px;">Drink target</div>'+rows+(ech?'<div class="dm-echo">'+ech+'</div>':'')+heatNote+'</div>';
 }
